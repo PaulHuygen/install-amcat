@@ -1,8 +1,11 @@
 #!/bin/bash
+# Install amcat 3.4 in wsgi-server on Ubuntu 14.04
+#  "???" means: is what follows still necessary? 
 CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+OLDD=`pwd`
 source $CWD/base.sh
 
-# Create logdir 
+# Create logdir ???
 if [ ! -e $AMCAT_LOGDIR ]
 then
   mkdir -p $AMCAT_LOGDIR
@@ -10,21 +13,40 @@ then
   chmod g+w $AMCAT_LOGDIR
 fi
 
-set -e
+# Postgresql
+if [ "$AMCAT_DB_HOST" = "localhost" ]; then
+    echo "Setting up database"
+    # Postgresql
+    service postgresql start
+    sudo -u postgres createuser -s $USER
+    createdb amcat
+#    apt-get install -y postgresql postgresql-contrib-9.1
+#    su postgres <<EOF
+#      set +e
+#      echo Create database $AMCAT_DB_NAME.
+#      createdb $AMCAT_DB_NAME
+#      echo Create  $AMCAT_DB_USER with password $AMCAT_DB_PASSWORD.
+#      psql $AMCAT_DB_NAME -c "create user $AMCAT_DB_USER password '$AMCAT_DB_PASSWORD';" 
+#      set -e
+#      psql -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";' amcat
+#EOF
+fi
 
-# Installing packages that have not yet been included in apt-requirements.txt
-apt-get install -y  python-dev
+#
+# Bower
+#
+apt-get -y install nodejs-legacy npm
+npm install -g bower
 
-
-#echo "Installing git and pip"
-apt-get install -y git python-pip
-
+#
+# Download and install Amcat
+#
 echo Download amcat in $AMCAT_ROOT
-AMCAT_REPO=$AMCAT_ROOT/amcat
+AMCAT_REPO=$AMCAT_ROOT
 if [ ! -d "$AMCAT_REPO" ]; then
     echo "Cloning repository into $AMCAT_REPO"
 #   git clone https://github.com/amcat/amcat.git  $AMCAT_REPO
-   git clone $REMOTE_AMCAT_REPO  $AMCAT_REPO
+   git clone -b $AMCAT_GITBRANCHE  $REMOTE_AMCAT_REPO  $AMCAT_REPO
    chown -R $AMCAT_USER:adm $AMCAT_REPO
    chmod -R g+ws $AMCAT_REPO
    echo "Repository cloned"
@@ -32,30 +54,21 @@ fi
 
 echo "Installing amcat dependencies"
 cat $AMCAT_REPO/apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
-pip --default-timeout=100 install -r $AMCAT_REPO/pip_requirements.txt --use-mirrors 
+pip install -r $AMCAT_REPO/pip_requirements.txt 
 
-if [ "$AMCAT_DB_HOST" = "localhost" ]; then
-    echo "Setting up database"
-    apt-get install -y postgresql postgresql-contrib-9.1
-    su postgres <<EOF
-      set +e
-      echo Create database $AMCAT_DB_NAME.
-      createdb $AMCAT_DB_NAME
-      echo Create  $AMCAT_DB_USER with password $AMCAT_DB_PASSWORD.
-      psql $AMCAT_DB_NAME -c "create user $AMCAT_DB_USER password '$AMCAT_DB_PASSWORD';" 
-      set -e
-      psql -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";' amcat
-EOF
+export PYTHONPATH=$PYTHONPATH:/usr/local/share/amcat
+export AMCAT_ES_LEGACY_HASH=N
+echo 'export PYTHONPATH=$PYTHONPATH:/usr/local/share/amcat' >> /etc/profile.d/amcat
+echo 'export AMCAT_ES_LEGACY_HASH=N' >> /etc/profile.d/amcat
+cd amcat
+bower --allow-root install
+python -m amcat.manage syncdb
 
-    cd $AMCAT_REPO
-    PYTHONPATH=. DJANGO_DB_HOST=localhost DJANGO_DB_NAME=$AMCAT_DB_NAME \
-	DJANGO_DB_USER=$AMCAT_DB_USER DJANGO_DB_PASSWORD=$AMCAT_DB_PASSWORD \
-	DJANGO_SETTINGS_MODULE=settings ./manage.py syncdb --noinput 
-    PYTHONPATH=. DJANGO_DB_HOST=localhost DJANGO_DB_NAME=$AMCAT_DB_NAME \
-	DJANGO_DB_USER=$AMCAT_DB_USER DJANGO_DB_PASSWORD=$AMCAT_DB_PASSWORD \
-	DJANGO_SETTINGS_MODULE=settings ./manage.py collectstatic --noinput
 
-fi
+
+#
+# WSGI
+#
 
 echo "Installing uwsgi"
 pip install uwsgi
@@ -82,8 +95,8 @@ set +e
 start amcat_wsgi
 set -e
 
-echo "Installing nginx"
-apt-get install -y nginx
+#echo "Installing nginx" ???
+#apt-get install -y nginx
 
 # The default nginx conflicts with amcat, so throw it out of the way
 rm -rf /etc/nginx/sites-enabled/default
@@ -107,6 +120,9 @@ set +e
 /etc/init.d/nginx restart
 set -e
 
+#
+# Celery
+#
 
 echo "Configuring and starting celery workers"
 set +e

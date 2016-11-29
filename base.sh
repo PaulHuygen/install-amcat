@@ -1,8 +1,19 @@
 PWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $PWD/defaults.cfg
 
-echo "Installing basic features."
-apt-get install -y curl software-properties-common python-software-properties git python-pip
+echo "Installing basic Ubuntu features."
+#
+# To install recent version of R
+#
+apt-get update && apt-get -y upgrade 
+apt-get -y install apt-transport-https 
+echo 'deb https://mirrors.cicku.me/CRAN/bin/linux/ubuntu trusty/' > /etc/apt/sources.list.d/r-cran-trusty.list
+echo 'deb https://cran.rstudio.com/bin/linux/ubuntu trusty/' >> /etc/apt/sources.list.d/r-cran-trusty.list
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $APT_KEY
+#
+# Install required Ubuntu packages
+#
+cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
 
 echo "Checking whether user $AMCAT_USER exists"
 # The directory that contains $AMCAT_ROOT will be the user's home directory
