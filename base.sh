@@ -5,11 +5,11 @@ echo "Installing basic Ubuntu features."
 #
 # To install recent version of R
 #
-apt-get update && apt-get -y upgrade 
 apt-get -y install apt-transport-https 
 echo 'deb https://mirrors.cicku.me/CRAN/bin/linux/ubuntu trusty/' > /etc/apt/sources.list.d/r-cran-trusty.list
 echo 'deb https://cran.rstudio.com/bin/linux/ubuntu trusty/' >> /etc/apt/sources.list.d/r-cran-trusty.list
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $APT_KEY
+apt-get update && apt-get -y upgrade 
 #
 # Install required Ubuntu packages
 #
