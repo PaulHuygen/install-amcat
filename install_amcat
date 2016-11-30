@@ -23,6 +23,7 @@ cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
 # apt-get -y install r-base r-base-dev
 echo "Checking whether user $AMCAT_USER exists"
 # The directory that contains $AMCAT_ROOT will be the user's home directory
+set +e
 getent passwd $AMCAT_USER  > /dev/null
 if [ $? -eq 2 ]; then
     echo "Creating user..."
@@ -31,6 +32,7 @@ if [ $? -eq 2 ]; then
     mkdir -p $USER_HOME
     chown amcat:amcat $USER_HOME
 fi
+set -e
 #
 # Install java when no java can be found
 #
@@ -38,7 +40,7 @@ echo "Checking java install."
 which java >/dev/null
 if [ $? -ne 0 ]; then
     if
-      [ ! -e ../$JAVABALL ]
+      [ ! -e $JAVABALL ]
     then
       echo No java. Please provide $JAVABALL. 
       exit 4
@@ -71,7 +73,7 @@ createdb amcat
 #for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 cd /tmp
 # wget "https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.deb"
-wget $ELASTICDEB
+wget $ELASTIC_DEB_URL
 dpkg -i $ELASTICDEB
 rm $ELASTICDEB
 cd $OLDD
@@ -80,9 +82,10 @@ cd $OLDD
 /usr/share/elasticsearch/bin/plugin -install lukas-vlcek/bigdesk
 echo -e "\nscript.disable_dynamic: false" | tee -a /etc/elasticsearch/elasticsearch.yml
 if
- [ -z "$JAVA_HOME" ]
+ [ ! -z "$JAVA_HOME" ]
 then
-  echo 'JAVA_HOME=$JAVA_HOME' >> /etc/default/elasticsearch
+  echo "JAVA_HOME=$JAVA_HOME" >> /etc/default/elasticsearch
+fi
 #
 # Hitcount
 #
