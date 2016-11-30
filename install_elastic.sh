@@ -50,6 +50,7 @@ cd $OLDD
 
 # Allow dynamic scripting 
 echo -e "\nscript.disable_dynamic: false" | tee -a /etc/elasticsearch/elasticsearch.yml
+echo 'JAVA_HOME=/usr/local/share/jre1.8.0_111' >> /etc/default/elasticsearch
 
 #
 # Hitcount

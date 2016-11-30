@@ -1,29 +1,78 @@
-Installing AmCAT
-================
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1. Installing AmCAT</a></li>
+<li><a href="#sec-2">2. Installation steps</a></li>
+<li><a href="#sec-3">3. Description of the files</a></li>
+</ul>
+</div>
+</div>
+
+
+
+# Installing AmCAT<a id="sec-1" name="sec-1"></a>
 
 This repository contains a number of useful scripts for automatic
-installation of AmCAT version 3.4 (github.com/amcat/amcat). 
-In particular, it has scripts to install the separate components of AmCAT on the same or different computers.
+installation of AmCAT version 3.4 (<http://github.com/amcat/amcat>) on a server
+running Ubuntu 14.04. 
+In contrast to older versions of this repo, this version contains a
+single script, `install_amcat`, to install everything that is needed on a single server,
+i.e.:
 
-The components/scripts are:
-* install_elastic.sh. This installs elastic together with the HitCountSimilarity extension
-* install_wsgi.sh. This installs the AmCAT navigator on uwsgi+nginx. If the database is set to localhost, it also sets up the database. It assumes that an elastic node is reachable.
+1.  postgresql
+2.  elastic search (with the HitCountSimilarity extension)
+3.  amcat
+4.  wsgi+nginx
+5.  celery
 
-The repository contains a number of -dist files that function as templates for configuration files. The default.cfg file contains default values for the various parameters needed to install the AmCAT components. You can edit this file or supply these variables as environment variables.
-
-Context
--------
+## Context<a id="sec-1-1" name="sec-1-1"></a>
 
 The scripts are aimed at (and tested on) ubuntu 14.04 and rely on apt
-and pip to install dependencies. They use upstart (/etc/init) scripts
+and pip to install dependencies. They use upstart (`/etc/init`) scripts
 to install services. These scripts are supposed to be run as root.
 
-Java
-----
+## Java<a id="sec-1-2" name="sec-1-2"></a>
 
-Amcat needs Oracle Java vs. 8. Installation of this software from the
-reo of Oracle cannot be done automatically. Therefore the user should
-download the package jre-8u111-linux-x64.tar.gz manually from
-[Oracle](https://java.com/nl/download/manual.jsp)  and put it in the
-directory in which the current directory resides.
+ElasticSearch needs Java 8. The script installs Java if it doesn't
+find a Java binary in the path. So, if the server supports an obsolete
+version of java, there is a chance that ElasticSearch will not work.
 
+Oracle java cannot be installed automatically from a repository on
+Internet. Therefore, the user should download the tarball
+`jre-8u111-linux-x64.tar.gz` from [Oracle](https://java.com/nl/download/manual.jsp) and place it in the `/tmp/` 
+directory. If the script needs the tarball, but cannot find it, it aborts execution.
+
+# Installation steps<a id="sec-2" name="sec-2"></a>
+
+1.  Clone this repository.
+2.  Check `defaults.cfg`. Generate a `local.cfg` if settings need to be
+    to overridden.
+3.  Download `jre-8u111-linux-x64.tar.gz` from Oracle and put it in the
+    `/tmp` directory.
+4.  Run "install<sub>amcat</sub>"
+
+# Description of the files<a id="sec-3" name="sec-3"></a>
+
+## `defaults.cfg`: Defaults for the parameters.<a id="sec-3-1" name="sec-3-1"></a>
+
+The defaults will only be set when they didn't exist before invoking
+the script. Furthermore, the parameters can be overriden by setting
+them in a file `local.cfg` in the same directory.
+
+## `install_amcat`<a id="sec-3-2" name="sec-3-2"></a>
+
+The script that performs the installation
+
+## "dist"-files<a id="sec-3-3" name="sec-3-3"></a>
+
+`amcat_wsgi.conf-dist`, `amcat_celery.conf-dist`,
+`nginx-amcat.conf-dist`. They contain the content for configuration-files.
+
+## `apt-requirements.txt`<a id="sec-3-4" name="sec-3-4"></a>
+
+The Ubuntu packages that need to be installed for the Amcat environment.
+
+## `Dockerfile`<a id="sec-3-5" name="sec-3-5"></a>
+
+To build a docker container. Will be explained in a later commit.

@@ -15,6 +15,7 @@ apt-get update && apt-get -y upgrade
 #
 cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
 
+
 echo "Checking whether user $AMCAT_USER exists"
 # The directory that contains $AMCAT_ROOT will be the user's home directory
 getent passwd $AMCAT_USER  > /dev/null
@@ -26,9 +27,9 @@ if [ $? -eq 2 ]; then
     mkdir -p $USER_HOME
     chown amcat:amcat $USER_HOME
 fi
-set -e
+#set -e
 
-echo "Create folder $AMCAT_ROOT if needed"
-mkdir -p $AMCAT_ROOT
-chown amcat:amcat $AMCAT_ROOT
-set +e
+#echo "Create folder $AMCAT_ROOT if needed"
+#mkdir -p $AMCAT_ROOT
+#chown amcat:amcat $AMCAT_ROOT
+#set +e

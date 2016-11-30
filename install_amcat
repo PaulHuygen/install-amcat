@@ -1,0 +1,199 @@
+#!/bin/bash
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+OLDD=`pwd`
+set -e
+if
+  [ -e $SCRIPTDIR/local.cfg ]
+then
+  source $SCRIPTDIR/local.cfg
+fi
+source $SCRIPTDIR/defaults.cfg
+
+#
+# Install ubuntu packages
+#
+apt-get update && apt-get -y upgrade 
+apt-get -y install apt-transport-https 
+echo 'deb https://mirrors.cicku.me/CRAN/bin/linux/ubuntu trusty/' > /etc/apt/sources.list.d/r-cran-trusty.list
+echo 'deb https://cran.rstudio.com/bin/linux/ubuntu trusty/' >> /etc/apt/sources.list.d/r-cran-trusty.list
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $APT_KEY
+apt-get update && apt-get -y upgrade 
+cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
+#apt-get -y install antiword unrtf rabbitmq-server python-pip python-dev libxml2-dev libxslt-dev lib32z1-dev postgresql postgresql-server-dev-9.3 postgresql-contrib-9.3 python-virtualenv git graphviz wget software-properties-common python-software-properties
+# apt-get -y install r-base r-base-dev
+echo "Checking whether user $AMCAT_USER exists"
+# The directory that contains $AMCAT_ROOT will be the user's home directory
+getent passwd $AMCAT_USER  > /dev/null
+if [ $? -eq 2 ]; then
+    echo "Creating user..."
+    USER_HOME=`dirname $AMCAT_ROOT` 
+    useradd -Ms/bin/bash --home "$USER_HOME" $AMCAT_USER
+    mkdir -p $USER_HOME
+    chown amcat:amcat $USER_HOME
+fi
+#
+# Install java when no java can be found
+#
+echo "Checking java install."
+which java >/dev/null
+if [ $? -ne 0 ]; then
+    if
+      [ ! -e ../$JAVABALL ]
+    then
+      echo No java. Please provide $JAVABALL. 
+      exit 4
+    fi
+   cd $JAVA_SOCKET
+   tar -xzf $JAVABALL   
+   export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME
+   echo 'export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME' >> /etc/profile.d/amcat
+   for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
+fi
+
+#
+#
+# Postgresql
+#
+set +e
+service postgresql start
+set -e
+sudo -u postgres createuser -s root
+createdb amcat
+
+#
+# Elastic Search
+#
+#cd /usr/local/share
+#tar -xzf /tmp/jre-8u111-linux-x64.tar.gz
+#rm /tmp/jre-8u111-linux-x64.tar.gz
+#export JAVA_HOME=/usr/local/share/jre1.8.0_111
+#echo 'export JAVA_HOME=/usr/local/share/jre1.8.0_111' >> /etc/profile.d/amcat
+#for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
+cd /tmp
+# wget "https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.deb"
+wget $ELASTICDEB
+dpkg -i $ELASTICDEB
+rm $ELASTICDEB
+cd $OLDD
+/usr/share/elasticsearch/bin/plugin -install elasticsearch/elasticsearch-analysis-icu/2.4.2
+/usr/share/elasticsearch/bin/plugin -install mobz/elasticsearch-head
+/usr/share/elasticsearch/bin/plugin -install lukas-vlcek/bigdesk
+echo -e "\nscript.disable_dynamic: false" | tee -a /etc/elasticsearch/elasticsearch.yml
+if
+ [ -z "$JAVA_HOME" ]
+then
+  echo 'JAVA_HOME=$JAVA_HOME' >> /etc/default/elasticsearch
+#
+# Hitcount
+#
+wget $HITCOUNTJAR_URL -O /usr/share/elasticsearch/hitcount.jar
+sed </etc/init.d/elasticsearch '/ES_HOME=/a\ES_CLASSPATH=$ES_HOME/hitcount.jar' >/tmp/es1
+sed </tmp/es1 '/ES_CLASSPATH=/a\export ES_CLASSPATH' >/tmp/es2
+sed </tmp/es2 '/DAEMON_OPTS=/s/\"$/ -Des.index.similarity.default.type=nl.vu.amcat.HitCountSimilarityProvider\"/' >/etc/init.d/elasticsearch
+rm /tmp/es1 /tmp/es2
+service elasticsearch restart
+
+#
+# Bower
+#
+# apt-get -y install nodejs-legacy npm
+npm install -g bower
+
+#
+# Amcat
+#
+if
+  [ ! -d $AMCAT_ROOT ]
+then
+  cd $AMCAT_SOCKET
+  git clone -b $AMCAT_GITBRANCHE $AMCAT_REMOTE_REPO
+  cd $AMCAT_ROOT
+  pip install -r requirements.txt
+  export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT
+  export AMCAT_ES_LEGACY_HASH=N
+  echo 'export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT' >> /etc/profile.d/amcat
+  echo 'export AMCAT_ES_LEGACY_HASH=N' >> /etc/profile.d/amcat
+  cd $OLDD
+fi
+cd amcat
+bower --allow-root install
+python -m amcat.manage syncdb
+#
+# WSGI
+#
+pip install uwsgi
+
+set +e
+stop amcat_wsgi
+set -e
+
+SRC=$SCRIPTDIR/amcat_wsgi.conf-dist
+TRG=/etc/init/amcat_wsgi.conf
+echo "Checking upstart script at $TRG"
+if [ ! -e $TRG ]; then
+    echo "Creating upstart script $TRG from $SRC"
+    sed -e "s#__AMCAT_ROOT__#$AMCAT_ROOT#" \
+	-e "s#__AMCAT_USER__#$AMCAT_USER#" \
+	-e "s#__AMCAT_DB_HOST__#$AMCAT_DB_HOST#" \
+	-e "s#__AMCAT_DB_USER__#$AMCAT_DB_USER#" \
+	-e "s#__AMCAT_DB_NAME__#$AMCAT_DB_NAME#" \
+	-e "s#__AMCAT_DB_PASSWORD__#$AMCAT_DB_PASSWORD#" \
+	-e "s#__UWSGI_SOCKET__#$UWSGI_SOCKET#"  < $SRC > $TRG
+    chmod 600 $TRG
+fi
+
+set +e
+start amcat_wsgi
+set -e
+
+#
+# NGINX
+#
+
+# The default nginx conflicts with amcat, so throw it out of the way
+rm -rf /etc/nginx/sites-enabled/default
+
+SRC=$SCRIPTDIR/nginx-amcat.conf-dist
+TRG=/etc/nginx/sites-available/amcat.conf
+echo "Checking nginx site at $TRG"
+if [ ! -e $TRG ]; then
+    echo "Creating upstart script $TRG from $SRC"
+    sed -e "s#__SERVER_NAME__#$SERVER_NAME#" \
+        -e "s#__AMCAT_REPO__#$AMCAT_ROOT#" \
+        -e "s#__NGINX_UWSGI_SOCKET__#$NGINX_UWSGI_SOCKET#"  < $SRC > $TRG
+fi
+LN=/etc/nginx/sites-enabled/amcat.conf
+if [ ! -e $LN ]; then
+    echo "Linking $LN -> $TRG"
+    ln -s $TRG $LN
+fi
+
+set +e
+/etc/init.d/nginx restart
+set -e
+
+#
+# Celery
+#
+
+echo "Configuring and starting celery workers"
+set +e
+stop amcat_celery
+set -e
+
+SRC=$CWD/amcat_celery.conf-dist
+TRG=/etc/init/amcat_celery.conf
+echo "Checking upstart script at $TRG"
+if [ ! -e $TRG ]; then
+    echo "Creating upstart script $TRG from $SRC"
+    sed -e "s#__AMCAT_ROOT__#$AMCAT_REPO#" \
+        -e "s#__AMCAT_USER__#$AMCAT_USER#" \
+        -e "s#__AMCAT_DB_HOST__#$AMCAT_DB_HOST#" \
+        -e "s#__AMCAT_DB_USER__#$AMCAT_DB_USER#" \
+        -e "s#__AMCAT_DB_NAME__#$AMCAT_DB_NAME#" \
+        -e "s#__AMCAT_DB_PASSWORD__#$AMCAT_DB_PASSWORD#" < $SRC > $TRG
+    chmod 600 $TRG
+fi
+set +e
+start amcat_celery
+set -e

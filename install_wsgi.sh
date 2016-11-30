@@ -35,7 +35,7 @@ fi
 #
 # Bower
 #
-apt-get -y install nodejs-legacy npm
+#apt-get -y install nodejs-legacy npm
 npm install -g bower
 
 #
@@ -54,7 +54,7 @@ fi
 
 echo "Installing amcat dependencies"
 cat $AMCAT_REPO/apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
-pip install -r $AMCAT_REPO/pip_requirements.txt 
+pip install -r $AMCAT_REPO/requirements.txt 
 
 export PYTHONPATH=$PYTHONPATH:/usr/local/share/amcat
 export AMCAT_ES_LEGACY_HASH=N
