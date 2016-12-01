@@ -12,13 +12,20 @@ source $SCRIPTDIR/defaults.cfg
 #
 # Install ubuntu packages
 #
-apt-get update && apt-get -y upgrade 
-apt-get -y install apt-transport-https 
-echo 'deb https://mirrors.cicku.me/CRAN/bin/linux/ubuntu trusty/' > /etc/apt/sources.list.d/r-cran-trusty.list
-echo 'deb https://cran.rstudio.com/bin/linux/ubuntu trusty/' >> /etc/apt/sources.list.d/r-cran-trusty.list
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $APT_KEY
-apt-get update && apt-get -y upgrade 
-cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
+if
+    [ -e /etc/apt/sources.list.d/r-cran-trusty.list ]
+then
+    echo Ubuntu already prepared.
+else
+    echo Prepare Ubuntu
+    apt-get update && apt-get -y upgrade 
+    apt-get -y install apt-transport-https 
+    echo 'deb https://mirrors.cicku.me/CRAN/bin/linux/ubuntu trusty/' > /etc/apt/sources.list.d/r-cran-trusty.list
+    echo 'deb https://cran.rstudio.com/bin/linux/ubuntu trusty/' >> /etc/apt/sources.list.d/r-cran-trusty.list
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $APT_KEY
+    apt-get update && apt-get -y upgrade 
+    cat apt_requirements.txt | tr '\n' ' ' | xargs apt-get install -y
+fi
 #apt-get -y install antiword unrtf rabbitmq-server python-pip python-dev libxml2-dev libxslt-dev lib32z1-dev postgresql postgresql-server-dev-9.3 postgresql-contrib-9.3 python-virtualenv git graphviz wget software-properties-common python-software-properties
 # apt-get -y install r-base r-base-dev
 echo "Checking whether user $AMCAT_USER exists"
@@ -39,7 +46,6 @@ set -e
 echo "Checking java install."
 set +e
 which java >/dev/null
-set -e
 if [ $? -ne 0 ]; then
     if
       [ ! -e $JAVABALL ]
@@ -53,10 +59,12 @@ if [ $? -ne 0 ]; then
    echo 'export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME' >> /etc/profile.d/amcat
    for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 fi
+set -e
 #
 #
 # Postgresql
 #
+echo Configure Postgresql
 set +e
 service postgresql start
 set -e
@@ -66,6 +74,7 @@ createdb amcat
 #
 # Elastic Search
 #
+echo ElasticSearch
 #cd /usr/local/share
 #tar -xzf /tmp/jre-8u111-linux-x64.tar.gz
 #rm /tmp/jre-8u111-linux-x64.tar.gz
@@ -74,29 +83,40 @@ createdb amcat
 #for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 cd /tmp
 # wget "https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.deb"
-wget $ELASTIC_DEB_URL
-dpkg -i $ELASTICDEB
-rm $ELASTICDEB
-cd $OLDD
-/usr/share/elasticsearch/bin/plugin -install elasticsearch/elasticsearch-analysis-icu/2.4.2
-/usr/share/elasticsearch/bin/plugin -install mobz/elasticsearch-head
-/usr/share/elasticsearch/bin/plugin -install lukas-vlcek/bigdesk
-echo -e "\nscript.disable_dynamic: false" | tee -a /etc/elasticsearch/elasticsearch.yml
+set +e
+dpkg -l | grep elasticsearch >/dev/null
 if
- [ ! -z "$JAVA_HOME" ]
+    [ $? -gt 0 ]
 then
-  echo "JAVA_HOME=$JAVA_HOME" >> /etc/default/elasticsearch
+    echo Install ElasticSearch
+    wget $ELASTIC_DEB_URL
+    dpkg -i $ELASTICDEB
+    rm $ELASTICDEB
+    /usr/share/elasticsearch/bin/plugin -install elasticsearch/elasticsearch-analysis-icu/2.4.2
+    /usr/share/elasticsearch/bin/plugin -install mobz/elasticsearch-head
+    /usr/share/elasticsearch/bin/plugin -install lukas-vlcek/bigdesk
+    echo -e "\nscript.disable_dynamic: false" | tee -a /etc/elasticsearch/elasticsearch.yml
+    if
+        [ ! -z "$JAVA_HOME" ]
+    then
+        echo "JAVA_HOME=$JAVA_HOME" >> /etc/default/elasticsearch
+    fi
 fi
+set -e
+cd $OLDD
 #
 # Hitcount
 #
-wget $HITCOUNTJAR_URL -O /usr/share/elasticsearch/hitcount.jar
-sed </etc/init.d/elasticsearch '/ES_HOME=/a\ES_CLASSPATH=$ES_HOME/hitcount.jar' >/tmp/es1
-sed </tmp/es1 '/ES_CLASSPATH=/a\export ES_CLASSPATH' >/tmp/es2
-sed </tmp/es2 '/DAEMON_OPTS=/s/\"$/ -Des.index.similarity.default.type=nl.vu.amcat.HitCountSimilarityProvider\"/' >/etc/init.d/elasticsearch
-rm /tmp/es1 /tmp/es2
-service elasticsearch restart
-
+if
+    [ ! -e /usr/share/elasticsearch/hitcount.jar ]
+then
+    wget $HITCOUNTJAR_URL -O /usr/share/elasticsearch/hitcount.jar
+    sed </etc/init.d/elasticsearch '/ES_HOME=/a\ES_CLASSPATH=$ES_HOME/hitcount.jar' >/tmp/es1
+    sed </tmp/es1 '/ES_CLASSPATH=/a\export ES_CLASSPATH' >/tmp/es2
+    sed </tmp/es2 '/DAEMON_OPTS=/s/\"$/ -Des.index.similarity.default.type=nl.vu.amcat.HitCountSimilarityProvider\"/' >/etc/init.d/elasticsearch
+    rm /tmp/es1 /tmp/es2
+    service elasticsearch restart
+fi
 #
 # Bower
 #
@@ -117,11 +137,10 @@ then
   export AMCAT_ES_LEGACY_HASH=N
   echo 'export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT' >> /etc/profile.d/amcat
   echo 'export AMCAT_ES_LEGACY_HASH=N' >> /etc/profile.d/amcat
-  cd $OLDD
+  cd amcat
+  bower --allow-root install
+  python -m amcat.manage syncdb
 fi
-cd amcat
-bower --allow-root install
-python -m amcat.manage syncdb
 #
 # WSGI
 #
