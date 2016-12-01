@@ -142,7 +142,6 @@ then
   export AMCAT_ES_LEGACY_HASH=N
   echo 'export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT' >> /etc/profile.d/amcat
   echo 'export AMCAT_ES_LEGACY_HASH=N' >> /etc/profile.d/amcat
-  cd amcat
   bower --allow-root install
   python -m amcat.manage syncdb
 fi
