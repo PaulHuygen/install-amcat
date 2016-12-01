@@ -37,7 +37,9 @@ set -e
 # Install java when no java can be found
 #
 echo "Checking java install."
+set +e
 which java >/dev/null
+set -e
 if [ $? -ne 0 ]; then
     if
       [ ! -e $JAVABALL ]
@@ -51,7 +53,6 @@ if [ $? -ne 0 ]; then
    echo 'export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME' >> /etc/profile.d/amcat
    for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 fi
-
 #
 #
 # Postgresql
