@@ -59,6 +59,11 @@ if [ $? -ne 0 ]; then
    echo 'export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME' >> /etc/profile.d/amcat
    for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 fi
+if
+    [ -d $JAVA_SOCKET/$JAVABASENAME ]
+then
+   export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME
+fi    
 set -e
 #
 #
@@ -67,9 +72,9 @@ set -e
 echo Configure Postgresql
 set +e
 service postgresql start
-set -e
 sudo -u postgres createuser -s root
 createdb amcat
+set -e
 
 #
 # Elastic Search
