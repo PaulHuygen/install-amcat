@@ -208,7 +208,7 @@ set +e
 stop amcat_celery
 set -e
 
-SRC=$CWD/amcat_celery.conf-dist
+SRC=$SCRIPTDIR/amcat_celery.conf-dist
 TRG=/etc/init/amcat_celery.conf
 echo "Checking upstart script at $TRG"
 if [ ! -e $TRG ]; then
