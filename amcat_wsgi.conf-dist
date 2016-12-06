@@ -21,4 +21,11 @@ env UWSGI_MAX_REQUESTS=50
 env UWSGI_BUFFER_SIZE=8192
 
 respawn
-exec `which uwsgi` --logto /var/log/amcat_uwsgi.log --socket $UWSGI_SOCKET --chmod --uid $AMCATUSER --gid $AMCATGROUP --chdir $AMCATROOT --processes 4 --master -w navigator.wsgi
+exec `which uwsgi` \
+     --logto /var/log/amcat_uwsgi.log \
+     --socket $UWSGI_SOCKET \
+     --chmod --uid $AMCATUSER --gid $AMCATGROUP \
+     --chdir $AMCATROOT \
+     --processes 4 \
+     --master \
+     --wsgi-file navigator/wsgi.py
