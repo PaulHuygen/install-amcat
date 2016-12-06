@@ -56,7 +56,7 @@ if [ $? -ne 0 ]; then
    cd $JAVA_SOCKET
    tar -xzf $JAVABALL   
    export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME
-   echo 'export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME' >> /etc/profile.d/amcat
+   echo "export JAVA_HOME=$JAVA_SOCKET/$JAVABASENAME" >> /etc/profile.d/amcat
    for file in $JAVA_HOME/bin/* ; do ln -s $file /usr/local/bin/ ; done 
 fi
 if
@@ -140,7 +140,7 @@ then
   pip install -r requirements.txt
   export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT
   export AMCAT_ES_LEGACY_HASH=N
-  echo 'export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT' >> /etc/profile.d/amcat
+  echo "export PYTHONPATH=$PYTHONPATH:$AMCAT_ROOT" >> /etc/profile.d/amcat
   echo 'export AMCAT_ES_LEGACY_HASH=N' >> /etc/profile.d/amcat
   bower --allow-root install
   python -m amcat.manage syncdb
